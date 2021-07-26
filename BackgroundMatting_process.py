@@ -97,6 +97,20 @@ class BackgroundMattingProcess(core.CProtocolTask):
         self.addOutput(output_fgr)
         self.addOutput(output_err)
 
+        #model construction
+        self.param.model_refine_kernel_size = 3
+
+        if param.model_type == 'mattingbase':
+            self.model = MattingBase(param.model_backbone)
+        if param.model_type == 'mattingrefine':
+            self.model = MattingRefine(
+                param.model_backbone,
+                param.model_backbone_scale,
+                param.model_refine_mode,
+                param.model_refine_pixels,
+                param.model_refine_threshold,
+                param.model_refine_kernel_size)
+
         # Create parameters class
         if param is None:
             self.setParam(BackgroundMattingParam())
@@ -146,7 +160,7 @@ class BackgroundMattingProcess(core.CProtocolTask):
         input_bck = self.getInput(1)
         input_bck_integration = self.getInput(2)
         img = input_img.getImage()
-        bck = input_bck.getImage()
+        bck = input_bck.getImage()""
         bck_integration = input_bck_integration.getImage()
         # resize of the optional bck
         if input_bck_integration.isDataAvailable():
@@ -171,21 +185,9 @@ class BackgroundMattingProcess(core.CProtocolTask):
         else:
             device_ = 'cpu'
         device = torch.device(device_)
-        param.model_refine_kernel_size = 3
-
-        if param.model_type == 'mattingbase':
-            model = MattingBase(param.model_backbone)
-        if param.model_type == 'mattingrefine':
-            model = MattingRefine(
-                param.model_backbone,
-                param.model_backbone_scale,
-                param.model_refine_mode,
-                param.model_refine_pixels,
-                param.model_refine_threshold,
-                param.model_refine_kernel_size)
 
         # download models/weights
-        model.to(device).eval()
+        self.model.to(device).eval()
         if param.model_backbone == "resnet101":
             if os.path.isfile(os.path.dirname(__file__) + "/download_model/resnet101.pth"):
                 pass
@@ -194,7 +196,7 @@ class BackgroundMattingProcess(core.CProtocolTask):
             if param.change_condition == "101":
                 pass
             else:
-                model.load_state_dict(
+                self.model.load_state_dict(
 
                     torch.load(Path(os.path.dirname(__file__) + "/download_model/resnet101.pth"),
                                map_location=device), strict=False)
@@ -208,7 +210,7 @@ class BackgroundMattingProcess(core.CProtocolTask):
             if param.change_condition == "50":
                 pass
             else:
-                model.load_state_dict(torch.load(Path(os.path.dirname(__file__) + "/download_model/resnet50.pth"),
+                self.model.load_state_dict(torch.load(Path(os.path.dirname(__file__) + "/download_model/resnet50.pth"),
                                map_location=device), strict=False)
                 param.change_condition = "50"
 
@@ -220,7 +222,7 @@ class BackgroundMattingProcess(core.CProtocolTask):
             if param.change_condition == "2":
                 pass
             else:
-                model.load_state_dict(torch.load(Path(os.path.dirname(__file__) + "/download_model/mobilenetv2.pth"),map_location=device), strict=False)
+                self.model.load_state_dict(torch.load(Path(os.path.dirname(__file__) + "/download_model/mobilenetv2.pth"),map_location=device), strict=False)
                 param.change_condition = "2"
         # conversion loop
         with torch.no_grad():
@@ -242,10 +244,11 @@ class BackgroundMattingProcess(core.CProtocolTask):
             # passing our data into the model
             src = img_np.to(device, non_blocking=True)
             bgr = bck_np.to(device, non_blocking=True)
+            bck_integration_tensor = bck_integration_tensor.to(device, non_blocking=True)
             if param.model_type == 'mattingbase':
                 alpha, fgr, err, _ = model(src, bgr)
             elif param.model_type == 'mattingrefine':
-                alpha, fgr, _, _, err, ref = model(src, bgr)
+                alpha, fgr, _, _, err, ref = self.model(src, bgr)
             composite = torch.cat([fgr * alpha.ne(0), alpha], dim=1)
             err = F.interpolate(err, src.shape[2:], mode='bilinear', align_corners=False)
 
@@ -304,7 +307,7 @@ class BackgroundMattingProcessFactory(dataprocess.CProcessFactory):
                                 "To achieve this goal,two neural networks are employed: a base network computes a " \
                                 "low-resolution result which is refined by a second network operating at " \
                                 "high-resolution.It is possible to replace the basic background with a new one by" \
-                                " adding it to the program input. "
+                                " adding it to the algorithm input. "
         self.info.authors = "Shanchuan Lin, Andrey Ryabtsev, Soumyadip Sengupta, Brian Curless, Steve Seitz, " \
                             "Ira Kemelmacher-Shlizerman"
         # relative path -> as displayed in Ikomia application process tree
@@ -321,7 +324,7 @@ class BackgroundMattingProcessFactory(dataprocess.CProcessFactory):
         # Code source repository
         self.info.repository = "https://github.com/PeterL1n/BackgroundMattingV2"
         # Keywords used for search
-        self.info.keywords = "background,matting,refinement"
+        self.info.keywords = "background,matting,refinement,alpha,foreground"
 
     def create(self, param=None):
         # Create process object
