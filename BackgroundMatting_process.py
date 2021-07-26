@@ -40,11 +40,9 @@ class BackgroundMattingParam(core.CProtocolTaskParam):
         self.model_refine_pixels = 80000
         self.model_refine_threshold = 0.7
         self.kernel_size = 3
-        self.change_condition = None
 
     def setParamMap(self, paramMap):
         self.model_type = paramMap["model_type"]
-        self.change_condition = paramMap["change_condition"]
         self.model_backbone = paramMap["model_backbone"]
         self.model_backbone_scale = int(paramMap["model_backbone"])
         self.model_refine_threshold = int(paramMap["model_refine_threshold"])
@@ -56,7 +54,6 @@ class BackgroundMattingParam(core.CProtocolTaskParam):
         paramMap = core.ParamMap()
         paramMap["model_type"] = self.model_type
         paramMap["model_backbone"] = self.model_backbone
-        paramMap["change_condition"] = self.change_condition
         paramMap["model_refine_mode"] = self.model_refine_mode
         paramMap["model_backbone_scale"] = str(self.model_backbone_scale)
         paramMap["model_refine_threshold"] = str(self.model_refine_threshold)
@@ -97,9 +94,9 @@ class BackgroundMattingProcess(core.CProtocolTask):
         self.addOutput(output_fgr)
         self.addOutput(output_err)
 
-        #model construction
-        self.param.model_refine_kernel_size = 3
+        self.change_condition = None
 
+        #model construction
         if param.model_type == 'mattingbase':
             self.model = MattingBase(param.model_backbone)
         if param.model_type == 'mattingrefine':
@@ -109,8 +106,7 @@ class BackgroundMattingProcess(core.CProtocolTask):
                 param.model_refine_mode,
                 param.model_refine_pixels,
                 param.model_refine_threshold,
-                param.model_refine_kernel_size)
-
+                3)
         # Create parameters class
         if param is None:
             self.setParam(BackgroundMattingParam())
@@ -160,7 +156,7 @@ class BackgroundMattingProcess(core.CProtocolTask):
         input_bck = self.getInput(1)
         input_bck_integration = self.getInput(2)
         img = input_img.getImage()
-        bck = input_bck.getImage()""
+        bck = input_bck.getImage()
         bck_integration = input_bck_integration.getImage()
         # resize of the optional bck
         if input_bck_integration.isDataAvailable():
@@ -193,26 +189,26 @@ class BackgroundMattingProcess(core.CProtocolTask):
                 pass
             else:
                 self.download_file_from_google_drive("1zysR-jW6jydA2zkWfevxD1JpQHglKG1_",Path(os.path.dirname(__file__) + "/download_model/resnet101.pth"))
-            if param.change_condition == "101":
+            if self.change_condition == "101":
                 pass
             else:
                 self.model.load_state_dict(
 
                     torch.load(Path(os.path.dirname(__file__) + "/download_model/resnet101.pth"),
                                map_location=device), strict=False)
-                param.change_condition = "101"
+                self.change_condition = "101"
 
         elif param.model_backbone == "resnet50":
             if os.path.isfile(os.path.dirname(__file__) + "/download_model/resnet101.pth"):
                 pass
             else:
                 self.download_file_from_google_drive("1ErIAsB_miVhYL9GDlYUmfbqlV293mSYf",Path(os.path.dirname(__file__) + "/download_model/resnet50.pth"))
-            if param.change_condition == "50":
+            if self.change_condition == "50":
                 pass
             else:
                 self.model.load_state_dict(torch.load(Path(os.path.dirname(__file__) + "/download_model/resnet50.pth"),
                                map_location=device), strict=False)
-                param.change_condition = "50"
+                self.change_condition = "50"
 
         else:
             if os.path.isfile(os.path.dirname(__file__) + "/download_model/mobilenetv2.pth"):
@@ -223,7 +219,7 @@ class BackgroundMattingProcess(core.CProtocolTask):
                 pass
             else:
                 self.model.load_state_dict(torch.load(Path(os.path.dirname(__file__) + "/download_model/mobilenetv2.pth"),map_location=device), strict=False)
-                param.change_condition = "2"
+                self.change_condition = "2"
         # conversion loop
         with torch.no_grad():
 
