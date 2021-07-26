@@ -17,13 +17,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from ikomia import core, dataprocess
-import copy, torch, requests
+import copy, torch, requests, cv2
 from torch.nn.modules.module import *
 from torch.nn import functional as F
+from pathlib import Path
 from numpy import asarray
 from model.model import MattingBase, MattingRefine
-
-
+import numpy as np
+import os
 # --------------------
 # - Class to handle the process parameters
 # - Inherits PyCore.CProtocolTaskParam from Ikomia API
@@ -32,13 +33,14 @@ class BackgroundMattingParam(core.CProtocolTaskParam):
 
     def __init__(self):
         core.CProtocolTaskParam.__init__(self)
-        self.model_type = "mattingbase"
+        self.model_type = "mattingrefine"
         self.model_backbone = "mobilenetv2"
         self.model_backbone_scale = 0.25
         self.model_refine_mode = "full"
         self.model_refine_pixels = 80000
         self.model_refine_threshold = 0.7
         self.kernel_size = 3
+        self.change_condition = None
 
     def setParamMap(self, paramMap):
         self.model_type = paramMap["model_type"]
@@ -48,6 +50,7 @@ class BackgroundMattingParam(core.CProtocolTaskParam):
         self.model_refine_mode = paramMap["model_refine_mode"]
         self.model_refine_pixels = int(paramMap["model_refine_pixels"])
         self.kernel_size = int(paramMap["kernel_size"])
+        self.change_condition = str(paramMap["change_condition"])
 
     def getParamMap(self):
         paramMap = core.ParamMap()
@@ -58,6 +61,7 @@ class BackgroundMattingParam(core.CProtocolTaskParam):
         paramMap["model_refine_threshold"] = str(self.model_refine_threshold)
         paramMap["model_refine_pixels"] = str(self.model_refine_pixels)
         paramMap["kernel_size"] = str(self.kernel_size)
+        paramMap["change_condition"] = self.change_condition
         return paramMap
 
 
@@ -70,12 +74,28 @@ class BackgroundMattingProcess(core.CProtocolTask):
     def __init__(self, name, param):
         core.CProtocolTask.__init__(self, name)
         # Add input/output of the process here
-        self.addInput(dataprocess.CImageProcessIO())
-        self.addInput(dataprocess.CImageProcessIO())
-        self.addOutput(dataprocess.CImageProcessIO())
-        self.addOutput(dataprocess.CImageProcessIO())
-        self.addOutput(dataprocess.CImageProcessIO())
-        self.addOutput(dataprocess.CImageProcessIO())
+        input_img = dataprocess.CImageProcessIO()
+        input_img.description = "Img - " + input_img.description
+        input_bck = dataprocess.CImageProcessIO()
+        input_bck.description = "Bck - " + input_bck.description
+        input_optional_bck = dataprocess.CImageProcessIO()
+        input_optional_bck.description = "Bck to integrate on the image - " + input_optional_bck.description
+
+        output_composite = dataprocess.CImageProcessIO()
+        output_alpha = dataprocess.CImageProcessIO()
+        output_fgr = dataprocess.CImageProcessIO()
+        output_err = dataprocess.CImageProcessIO()
+        output_composite.description = "Composite output - " + output_composite.description
+        output_alpha.description = "Alpha output - " + output_alpha.description
+        output_fgr.description = "Foreground output - " + output_fgr.description
+        output_err.description = "Error output - " + output_err.description
+        self.addInput(input_img)
+        self.addInput(input_bck)
+        self.addInput(input_optional_bck)
+        self.addOutput(output_composite)
+        self.addOutput(output_alpha)
+        self.addOutput(output_fgr)
+        self.addOutput(output_err)
 
         # Create parameters class
         if param is None:
@@ -88,30 +108,69 @@ class BackgroundMattingProcess(core.CProtocolTask):
         # This is handled by the main progress bar of Ikomia application
         return 1
 
+    # function to download model on google drive
+    def download_file_from_google_drive(self,id, destination):
+        URL = "https://docs.google.com/uc?export=download"
+
+        session = requests.Session()
+
+        response = session.get(URL, params={'id': id}, stream=True)
+        token = self.get_confirm_token(response)
+
+        if token:
+            params = {'id': id, 'confirm': token}
+            response = session.get(URL, params=params, stream=True)
+
+        self.save_response_content(response, destination)
+
+    def get_confirm_token(self,response):
+        for key, value in response.cookies.items():
+            if key.startswith('download_warning'):
+                return value
+
+        return None
+
+    def save_response_content(self, response, destination):
+        CHUNK_SIZE = 32768
+
+        with open(destination, "wb") as f:
+            for chunk in response.iter_content(CHUNK_SIZE):
+                if chunk:  # filter out keep-alive new chunks
+                    f.write(chunk)
+
     def run(self):
         # Core function of your process
         # Call beginTaskRun for initialization
         self.beginTaskRun()
         input_img = self.getInput(0)
         input_bck = self.getInput(1)
+        input_bck_integration = self.getInput(2)
         img = input_img.getImage()
         bck = input_bck.getImage()
+        bck_integration = input_bck_integration.getImage()
+        # resize of the optional bck
+        if img.shape != bck_integration.shape:
+            dim = tuple(img[:, :, 0].shape)
+            a, b = dim[0], dim[1]
+            final = b, a
+            bck_integration = cv2.resize(bck_integration, final, interpolation=cv2.INTER_LINEAR)
+
         # get param
         param = self.getParam()
         print("Start BackgroundMatting...")
-        # Verification if the input is empty
-        # if not input_img.isDataAvailable() or input_bck.isDataAvailable():
-        #    raise ValueError("your input is empty, restart the task")
+
         # Get output
         output_composite = self.getOutput(0)
         output_alpha = self.getOutput(1)
         output_fgr = self.getOutput(2)
         output_err = self.getOutput(3)
+        # program run place
         if torch.cuda.is_available():
             device_ = 'cuda'
         else:
             device_ = 'cpu'
         device = torch.device(device_)
+        param.model_refine_kernel_size = 3
 
         if param.model_type == 'mattingbase':
             model = MattingBase(param.model_backbone)
@@ -120,55 +179,102 @@ class BackgroundMattingProcess(core.CProtocolTask):
                 param.model_backbone,
                 param.model_backbone_scale,
                 param.model_refine_mode,
-                param.model_refine_sample_pixels,
+                param.model_refine_pixels,
                 param.model_refine_threshold,
                 param.model_refine_kernel_size)
-        '''#download models
+
+        # download models/weights
+        model.to(device).eval()
         if param.model_backbone == "resnet101":
-            if os.path.isfile(os.path.dirname(__file__)+"/download_model/resnet101.pth"):
+            if os.path.isfile(os.path.dirname(__file__) + "/download_model/resnet101.pth"):
                 pass
             else:
-                with open("C:\\Users\\Julien TEXIER\\Ikomia\\Plugins\\Python\\BackgroundMatting\\download_model\\resnet101.pth", 'w') as fp:
-                    download_model = requests.get("https://drive.google.com/file/d/1zysR-jW6jydA2zkWfevxD1JpQHglKG1_/view?usp=sharing")
-                    fp.write(download_model.content)
+                self.download_file_from_google_drive("1zysR-jW6jydA2zkWfevxD1JpQHglKG1_",os.path.dirname(__file__) + "/download_model/resnet101.pth")
+            if param.change_condition == "101":
+                pass
+            else:
+                model.load_state_dict(
+
+                    torch.load(Path(os.path.dirname(__file__) + "/download_model/resnet101.pth"),
+                               map_location=device), strict=False)
+                param.change_condition = "101"
+
         elif param.model_backbone == "resnet50":
-            download_model = requests.get("https://drive.google.com/file/d/1ErIAsB_miVhYL9GDlYUmfbqlV293mSYf/view?usp=sharing")
+            if os.path.isfile(os.path.dirname(__file__) + "/download_model/resnet101.pth"):
+                pass
+            else:
+                self.download_file_from_google_drive("1ErIAsB_miVhYL9GDlYUmfbqlV293mSYf",os.path.dirname(__file__) + "/download_model/resnet50.pth")
+            if param.change_condition == "50":
+                pass
+            else:
+                model.load_state_dict(torch.load(Path(os.path.dirname(__file__) + "/download_model/resnet50.pth"),
+                               map_location=device), strict=False)
+                param.change_condition = "50"
+
         else:
-            download_model = requests.get("https://drive.google.com/file/d/1b2FQH0yULaiBwe4ORUvSxXpdWLipjLsI/view?usp=sharing")
-
-'''
-
-        model = model.to(device).eval()
-        model.load_state_dict(
-
-            torch.load("C:\\Users\\Julien TEXIER\\Ikomia\\Plugins\\Python\\BackgroundMatting\\pytorch_mobilenetv2.pth",
-                       map_location=device), strict=False)
-
+            if os.path.isfile(os.path.dirname(__file__) + "/download_model/mobilenetv2.pth"):
+                pass
+            else:
+                self.download_file_from_google_drive("1b2FQH0yULaiBwe4ORUvSxXpdWLipjLsI",os.path.dirname(__file__) + "/download_model/mobilenetv2.pth")
+            if param.change_condition == "2":
+                pass
+            else:
+                model.load_state_dict(torch.load(Path(os.path.dirname(__file__) + "/download_model/mobilenetv2.pth"),map_location=device), strict=False)
+                param.change_condition = "2"
         # conversion loop
         with torch.no_grad():
-            img = asarray([img])
-            bck = asarray([bck])
-            img = torch.from_numpy(img).permute(0, 3, 1, 2).float()
-            bck = torch.from_numpy(bck).permute(0, 3, 1, 2).float()
-            src = img.to(device, non_blocking=True)
-            bgr = bck.to(device, non_blocking=True)
+
+            # converting values from my arrays to float between 0 and 1 (model format)
+            img_np = asarray([img])
+            bck_np = asarray([bck])
+            bck_integration_np = asarray([bck_integration])
+            img_np = img_np.astype(np.float32)
+            bck_np = bck_np.astype(np.float32)
+            bck_integration_np = bck_integration_np.astype(np.float32)
+            img_np = img_np / 255
+            bck_np = bck_np / 255
+            bck_integration_np = bck_integration_np / 255
+            img_np = torch.from_numpy(img_np).permute(0, 3, 1, 2)
+            bck_np = torch.from_numpy(bck_np).permute(0, 3, 1, 2)
+            bck_integration_tensor = torch.from_numpy(bck_integration_np).permute(0, 3, 1, 2)
+
+            # passing our data into the model
+            src = img_np.to(device, non_blocking=True)
+            bgr = bck_np.to(device, non_blocking=True)
             if param.model_type == 'mattingbase':
                 alpha, fgr, err, _ = model(src, bgr)
             elif param.model_type == 'mattingrefine':
                 alpha, fgr, _, _, err, ref = model(src, bgr)
-
             composite = torch.cat([fgr * alpha.ne(0), alpha], dim=1)
             err = F.interpolate(err, src.shape[2:], mode='bilinear', align_corners=False)
 
-            output_composite_npy = composite.squeeze().cpu().numpy()
-            output_err_npy = err.squeeze().cpu().numpy()
-            output_fgr_npy = fgr.squeeze().cpu().numpy()
-            output_alpha_npy = alpha.squeeze().cpu().numpy()
+            # converting model outputs in ikomia output format
+            output_composite_npy = (composite.permute(0, 2, 3, 1).cpu().numpy() * 255).astype("uint8")
+            output_err_npy = (err.permute(0, 2, 3, 1).cpu().numpy() * 255).astype("uint8")
+            output_fgr_npy = (fgr.permute(0, 2, 3, 1).cpu().numpy() * 255).astype("uint8")
+            output_alpha_npy = (alpha.permute(0, 2, 3, 1).cpu().numpy() * 255).astype("uint8")
 
-            output_composite.setImage(output_composite_npy)
+            # delete a dimension
+            output_fgr_npy = output_fgr_npy[0, :, :, :]
+            output_err_npy = output_err_npy[0, :, :, :]
+            output_composite_npy = output_composite_npy[0, :, :, :]
+            output_alpha_npy = output_alpha_npy[0, :, :, :]
+
+            # background integration
+            if input_bck_integration.isDataAvailable():
+                output_composite_f = fgr * alpha + bck_integration_tensor * (1 - alpha)
+                output_composite_inter = (output_composite_f.permute(0, 2, 3, 1).cpu().numpy() * 255).astype("uint8")[0,
+                                         :, :, :]
+                output_composite.setImage(output_composite_inter)
+            else:
+                output_composite.setImage(output_composite_npy)
+
+            # outputs recovery
             output_err.setImage(output_err_npy)
             output_fgr.setImage(output_fgr_npy)
             output_alpha.setImage(output_alpha_npy)
+
+            print("End of the process...")
 
         # Step progress bar:
         self.emitStepProgress()

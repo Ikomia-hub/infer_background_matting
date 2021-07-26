@@ -100,11 +100,6 @@ class BackgroundMattingWidget(core.CProtocolTaskWidget):
         self.grid_layout.addWidget(self.model_refine_pixels, 6, 1)
         self.model_refine_pixels.setValue(self.parameters.model_refine_pixels)
 
-        #Creation widget kernel size
-        self.kernel_size = 3
-
-
-
 
     def onApply(self):
 
