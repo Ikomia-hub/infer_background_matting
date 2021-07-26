@@ -294,19 +294,16 @@ class BackgroundMattingProcessFactory(dataprocess.CProcessFactory):
         # Set process information as string here
         self.info.name = "BackgroundMatting"
         self.info.shortDescription = "Real-Time High-Resolution Background Matting"
-        self.info.description = "We introduce a real-time, high-resolution background replacement technique which " \
-                                "operates at 30fps in 4K resolution, and 60fps for HD on a modern GPU. Our technique " \
+        self.info.description = "This algorithm is a real-time, high-resolution background replacement technique which " \
+                                "operates at 30fps in 4K resolution, and 60fps for HD on a modern GPU. The technique " \
                                 "is based on background matting, where an additional frame of the background is" \
                                 " captured and used in recovering the alpha matte and the foreground layer. " \
                                 "The main challenge is to compute a high-quality alpha matte, preserving strand-level " \
                                 "hair details, while processing high-resolution images in real-time. " \
-                                "To achieve this goal, we employ two neural networks; a base network computes a " \
+                                "To achieve this goal,two neural networks are employed: a base network computes a " \
                                 "low-resolution result which is refined by a second network operating at " \
-                                "high-resolution " \
-                                "on selective patches. We introduce two largescale video and image matting datasets: " \
-                                "VideoMatte240K and PhotoMatte13K/85. Our approach yields higher quality results " \
-                                "compared to the previous state-of-the-art in background matting, while simultaneously" \
-                                "yielding a dramatic boost in both speed and resolution."
+                                "high-resolution.It is possible to replace the basic background with a new one by" \
+                                " adding it to the program input. " \
         self.info.authors = "Shanchuan Lin, Andrey Ryabtsev, Soumyadip Sengupta, Brian Curless, Steve Seitz, " \
                             "Ira Kemelmacher-Shlizerman"
         # relative path -> as displayed in Ikomia application process tree
@@ -317,6 +314,7 @@ class BackgroundMattingProcessFactory(dataprocess.CProcessFactory):
         self.info.journal = "publication journal"
         self.info.year = 2020
         self.info.license = "MIT License"
+        self.info.iconPath = "icon/image.png"
         # URL of documentation
         self.info.documentationLink = "https://arxiv.org/abs/2012.07810"
         # Code source repository
