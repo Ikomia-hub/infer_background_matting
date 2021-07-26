@@ -44,24 +44,24 @@ class BackgroundMattingParam(core.CProtocolTaskParam):
 
     def setParamMap(self, paramMap):
         self.model_type = paramMap["model_type"]
+        self.change_condition = paramMap["change_condition"]
         self.model_backbone = paramMap["model_backbone"]
         self.model_backbone_scale = int(paramMap["model_backbone"])
         self.model_refine_threshold = int(paramMap["model_refine_threshold"])
         self.model_refine_mode = paramMap["model_refine_mode"]
         self.model_refine_pixels = int(paramMap["model_refine_pixels"])
         self.kernel_size = int(paramMap["kernel_size"])
-        self.change_condition = str(paramMap["change_condition"])
 
     def getParamMap(self):
         paramMap = core.ParamMap()
         paramMap["model_type"] = self.model_type
         paramMap["model_backbone"] = self.model_backbone
+        paramMap["change_condition"] = self.change_condition
         paramMap["model_refine_mode"] = self.model_refine_mode
         paramMap["model_backbone_scale"] = str(self.model_backbone_scale)
         paramMap["model_refine_threshold"] = str(self.model_refine_threshold)
         paramMap["model_refine_pixels"] = str(self.model_refine_pixels)
         paramMap["kernel_size"] = str(self.kernel_size)
-        paramMap["change_condition"] = self.change_condition
         return paramMap
 
 
@@ -149,11 +149,12 @@ class BackgroundMattingProcess(core.CProtocolTask):
         bck = input_bck.getImage()
         bck_integration = input_bck_integration.getImage()
         # resize of the optional bck
-        if img.shape != bck_integration.shape:
-            dim = tuple(img[:, :, 0].shape)
-            a, b = dim[0], dim[1]
-            final = b, a
-            bck_integration = cv2.resize(bck_integration, final, interpolation=cv2.INTER_LINEAR)
+        if input_bck_integration.isDataAvailable():
+            if img.shape != bck_integration.shape:
+                dim = tuple(img[:, :, 0].shape)
+                a, b = dim[0], dim[1]
+                final = b, a
+                bck_integration = cv2.resize(bck_integration, final, interpolation=cv2.INTER_LINEAR)
 
         # get param
         param = self.getParam()
@@ -189,7 +190,7 @@ class BackgroundMattingProcess(core.CProtocolTask):
             if os.path.isfile(os.path.dirname(__file__) + "/download_model/resnet101.pth"):
                 pass
             else:
-                self.download_file_from_google_drive("1zysR-jW6jydA2zkWfevxD1JpQHglKG1_",os.path.dirname(__file__) + "/download_model/resnet101.pth")
+                self.download_file_from_google_drive("1zysR-jW6jydA2zkWfevxD1JpQHglKG1_",Path(os.path.dirname(__file__) + "/download_model/resnet101.pth"))
             if param.change_condition == "101":
                 pass
             else:
@@ -203,7 +204,7 @@ class BackgroundMattingProcess(core.CProtocolTask):
             if os.path.isfile(os.path.dirname(__file__) + "/download_model/resnet101.pth"):
                 pass
             else:
-                self.download_file_from_google_drive("1ErIAsB_miVhYL9GDlYUmfbqlV293mSYf",os.path.dirname(__file__) + "/download_model/resnet50.pth")
+                self.download_file_from_google_drive("1ErIAsB_miVhYL9GDlYUmfbqlV293mSYf",Path(os.path.dirname(__file__) + "/download_model/resnet50.pth"))
             if param.change_condition == "50":
                 pass
             else:
@@ -215,7 +216,7 @@ class BackgroundMattingProcess(core.CProtocolTask):
             if os.path.isfile(os.path.dirname(__file__) + "/download_model/mobilenetv2.pth"):
                 pass
             else:
-                self.download_file_from_google_drive("1b2FQH0yULaiBwe4ORUvSxXpdWLipjLsI",os.path.dirname(__file__) + "/download_model/mobilenetv2.pth")
+                self.download_file_from_google_drive("1b2FQH0yULaiBwe4ORUvSxXpdWLipjLsI", Path(os.path.dirname(__file__) + "/download_model/mobilenetv2.pth"))
             if param.change_condition == "2":
                 pass
             else:
@@ -303,7 +304,7 @@ class BackgroundMattingProcessFactory(dataprocess.CProcessFactory):
                                 "To achieve this goal,two neural networks are employed: a base network computes a " \
                                 "low-resolution result which is refined by a second network operating at " \
                                 "high-resolution.It is possible to replace the basic background with a new one by" \
-                                " adding it to the program input. " \
+                                " adding it to the program input. "
         self.info.authors = "Shanchuan Lin, Andrey Ryabtsev, Soumyadip Sengupta, Brian Curless, Steve Seitz, " \
                             "Ira Kemelmacher-Shlizerman"
         # relative path -> as displayed in Ikomia application process tree
