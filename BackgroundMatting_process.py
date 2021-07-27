@@ -25,6 +25,8 @@ from numpy import asarray
 from model.model import MattingBase, MattingRefine
 import numpy as np
 import os
+
+
 # --------------------
 # - Class to handle the process parameters
 # - Inherits PyCore.CProtocolTaskParam from Ikomia API
@@ -36,29 +38,35 @@ class BackgroundMattingParam(core.CProtocolTaskParam):
         self.model_type = "mattingrefine"
         self.model_backbone = "mobilenetv2"
         self.model_backbone_scale = 0.25
-        self.model_refine_mode = "full"
+        self.model_refine_mode = "sampling"
         self.model_refine_pixels = 80000
         self.model_refine_threshold = 0.7
         self.kernel_size = 3
+        self.cuda = 'cuda'
+        self.update = False
 
     def setParamMap(self, paramMap):
         self.model_type = paramMap["model_type"]
         self.model_backbone = paramMap["model_backbone"]
+        self.cuda = paramMap["cuda"]
         self.model_backbone_scale = int(paramMap["model_backbone"])
         self.model_refine_threshold = int(paramMap["model_refine_threshold"])
         self.model_refine_mode = paramMap["model_refine_mode"]
         self.model_refine_pixels = int(paramMap["model_refine_pixels"])
         self.kernel_size = int(paramMap["kernel_size"])
+        self.update = int(paramMap["update"])
 
     def getParamMap(self):
         paramMap = core.ParamMap()
         paramMap["model_type"] = self.model_type
         paramMap["model_backbone"] = self.model_backbone
+        paramMap["cuda"] = self.cuda
         paramMap["model_refine_mode"] = self.model_refine_mode
         paramMap["model_backbone_scale"] = str(self.model_backbone_scale)
         paramMap["model_refine_threshold"] = str(self.model_refine_threshold)
         paramMap["model_refine_pixels"] = str(self.model_refine_pixels)
         paramMap["kernel_size"] = str(self.kernel_size)
+        paramMap["update"] = str(self.update)
         return paramMap
 
 
@@ -94,32 +102,22 @@ class BackgroundMattingProcess(core.CProtocolTask):
         self.addOutput(output_fgr)
         self.addOutput(output_err)
 
-        self.change_condition = None
-
-        #model construction
-        if param.model_type == 'mattingbase':
-            self.model = MattingBase(param.model_backbone)
-        if param.model_type == 'mattingrefine':
-            self.model = MattingRefine(
-                param.model_backbone,
-                param.model_backbone_scale,
-                param.model_refine_mode,
-                param.model_refine_pixels,
-                param.model_refine_threshold,
-                3)
+        self.model = None
         # Create parameters class
         if param is None:
             self.setParam(BackgroundMattingParam())
         else:
             self.setParam(copy.deepcopy(param))
 
+        param2 = self.getParam()
+        print(param2.cuda)
     def getProgressSteps(self, eltCount=1):
         # Function returning the number of progress steps for this process
         # This is handled by the main progress bar of Ikomia application
         return 1
 
     # function to download model on google drive
-    def download_file_from_google_drive(self,id, destination):
+    def download_file_from_google_drive(self, id, destination):
         URL = "https://docs.google.com/uc?export=download"
 
         session = requests.Session()
@@ -133,7 +131,7 @@ class BackgroundMattingProcess(core.CProtocolTask):
 
         self.save_response_content(response, destination)
 
-    def get_confirm_token(self,response):
+    def get_confirm_token(self, response):
         for key, value in response.cookies.items():
             if key.startswith('download_warning'):
                 return value
@@ -158,6 +156,7 @@ class BackgroundMattingProcess(core.CProtocolTask):
         img = input_img.getImage()
         bck = input_bck.getImage()
         bck_integration = input_bck_integration.getImage()
+        print(img.shape)
         # resize of the optional bck
         if input_bck_integration.isDataAvailable():
             if img.shape != bck_integration.shape:
@@ -176,55 +175,64 @@ class BackgroundMattingProcess(core.CProtocolTask):
         output_fgr = self.getOutput(2)
         output_err = self.getOutput(3)
         # program run place
-        if torch.cuda.is_available():
-            device_ = 'cuda'
-        else:
-            device_ = 'cpu'
+        device_ = param.cuda
         device = torch.device(device_)
 
-        # download models/weights
-        self.model.to(device).eval()
-        if param.model_backbone == "resnet101":
-            if os.path.isfile(os.path.dirname(__file__) + "/download_model/resnet101.pth"):
-                pass
-            else:
-                self.download_file_from_google_drive("1zysR-jW6jydA2zkWfevxD1JpQHglKG1_",Path(os.path.dirname(__file__) + "/download_model/resnet101.pth"))
-            if self.change_condition == "101":
-                pass
-            else:
-                self.model.load_state_dict(
+        if device_ == 'cuda' and torch.cuda.is_available() == 0:
+            device_ = 'cpu'
+            device = torch.device(device_)
+            print("cuda is not available on your machine, we pass in cpu")
 
+        if self.model is None or param.update is True:
+            if param.model_type == 'mattingbase':
+                self.model = MattingBase(backbone=param.model_backbone)
+            if param.model_type == 'mattingrefine':
+                self.model = MattingRefine(
+                    param.model_backbone,
+                    param.model_backbone_scale,
+                    param.model_refine_mode,
+                    param.model_refine_pixels,
+                    param.model_refine_threshold,
+                    3)
+            self.model.to(device).eval()
+            if param.model_backbone == "resnet101":
+                if os.path.isfile(os.path.dirname(__file__) + "/download_model/resnet101.pth"):
+                    pass
+                else:
+                    self.download_file_from_google_drive("1zysR-jW6jydA2zkWfevxD1JpQHglKG1_", Path(
+                        os.path.dirname(__file__) + "/download_model/resnet101.pth"))
+
+                self.model.load_state_dict(
                     torch.load(Path(os.path.dirname(__file__) + "/download_model/resnet101.pth"),
                                map_location=device), strict=False)
-                self.change_condition = "101"
 
-        elif param.model_backbone == "resnet50":
-            if os.path.isfile(os.path.dirname(__file__) + "/download_model/resnet101.pth"):
-                pass
-            else:
-                self.download_file_from_google_drive("1ErIAsB_miVhYL9GDlYUmfbqlV293mSYf",Path(os.path.dirname(__file__) + "/download_model/resnet50.pth"))
-            if self.change_condition == "50":
-                pass
-            else:
+            elif param.model_backbone == "resnet50":
+                if os.path.isfile(os.path.dirname(__file__) + "/download_model/resnet101.pth"):
+                    pass
+                else:
+                    self.download_file_from_google_drive("1ErIAsB_miVhYL9GDlYUmfbqlV293mSYf", Path(
+                        os.path.dirname(__file__) + "/download_model/resnet50.pth"))
+
                 self.model.load_state_dict(torch.load(Path(os.path.dirname(__file__) + "/download_model/resnet50.pth"),
-                               map_location=device), strict=False)
-                self.change_condition = "50"
+                                                      map_location=device), strict=False)
 
-        else:
-            if os.path.isfile(os.path.dirname(__file__) + "/download_model/mobilenetv2.pth"):
-                pass
             else:
-                self.download_file_from_google_drive("1b2FQH0yULaiBwe4ORUvSxXpdWLipjLsI", Path(os.path.dirname(__file__) + "/download_model/mobilenetv2.pth"))
-            if param.change_condition == "2":
-                pass
-            else:
-                self.model.load_state_dict(torch.load(Path(os.path.dirname(__file__) + "/download_model/mobilenetv2.pth"),map_location=device), strict=False)
-                self.change_condition = "2"
+                if os.path.isfile(os.path.dirname(__file__) + "/download_model/mobilenetv2.pth"):
+                    pass
+                else:
+                    self.download_file_from_google_drive("1b2FQH0yULaiBwe4ORUvSxXpdWLipjLsI", Path(
+                        os.path.dirname(__file__) + "/download_model/mobilenetv2.pth"))
+
+                self.model.load_state_dict(
+                    torch.load(Path(os.path.dirname(__file__) + "/download_model/mobilenetv2.pth"),
+                               map_location=device), strict=False)
+            param.update = False
+
         # conversion loop
         with torch.no_grad():
-
             # converting values from my arrays to float between 0 and 1 (model format)
             img_np = asarray([img])
+            print(img_np.shape)
             bck_np = asarray([bck])
             bck_integration_np = asarray([bck_integration])
             img_np = img_np.astype(np.float32)
@@ -233,6 +241,7 @@ class BackgroundMattingProcess(core.CProtocolTask):
             img_np = img_np / 255
             bck_np = bck_np / 255
             bck_integration_np = bck_integration_np / 255
+            print(img_np.shape)
             img_np = torch.from_numpy(img_np).permute(0, 3, 1, 2)
             bck_np = torch.from_numpy(bck_np).permute(0, 3, 1, 2)
             bck_integration_tensor = torch.from_numpy(bck_integration_np).permute(0, 3, 1, 2)
@@ -242,7 +251,7 @@ class BackgroundMattingProcess(core.CProtocolTask):
             bgr = bck_np.to(device, non_blocking=True)
             bck_integration_tensor = bck_integration_tensor.to(device, non_blocking=True)
             if param.model_type == 'mattingbase':
-                alpha, fgr, err, _ = model(src, bgr)
+                alpha, fgr, err, hid = self.model(src, bgr)
             elif param.model_type == 'mattingrefine':
                 alpha, fgr, _, _, err, ref = self.model(src, bgr)
             composite = torch.cat([fgr * alpha.ne(0), alpha], dim=1)
