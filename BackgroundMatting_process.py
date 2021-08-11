@@ -103,32 +103,41 @@ class BackgroundMattingProcess(core.CProtocolTask):
         self.addOutput(output_err)
 
         self.model = None
+
         # Create parameters class
         if param is None:
             self.setParam(BackgroundMattingParam())
         else:
             self.setParam(copy.deepcopy(param))
 
-        param2 = self.getParam()
-        print(param2.cuda)
-    def getProgressSteps(self, eltCount=1):
+        param = self.getParam()
+        # program run place
+        self.device_ = param.cuda
+        self.device = torch.device(self.device_)
+
+        if self.device_ == 'cuda' and torch.cuda.is_available() == 0:
+            self.device_ = 'cpu'
+            self.device = torch.device(self.device_)
+            print("cuda is not available on your machine, we pass in cpu")
+
+    def getProgressSteps(self, eltCount=7):
         # Function returning the number of progress steps for this process
         # This is handled by the main progress bar of Ikomia application
         return 1
 
     # function to download model on google drive
     def download_file_from_google_drive(self, id, destination):
+        path = os.path.dirname(__file__) + "/download_model"
+        if not os.path.exists(path):
+            os.makedirs(path)
         URL = "https://docs.google.com/uc?export=download"
-
         session = requests.Session()
 
         response = session.get(URL, params={'id': id}, stream=True)
         token = self.get_confirm_token(response)
-
         if token:
             params = {'id': id, 'confirm': token}
             response = session.get(URL, params=params, stream=True)
-
         self.save_response_content(response, destination)
 
     def get_confirm_token(self, response):
@@ -146,43 +155,9 @@ class BackgroundMattingProcess(core.CProtocolTask):
                 if chunk:  # filter out keep-alive new chunks
                     f.write(chunk)
 
-    def run(self):
-        # Core function of your process
-        # Call beginTaskRun for initialization
-        self.beginTaskRun()
-        input_img = self.getInput(0)
-        input_bck = self.getInput(1)
-        input_bck_integration = self.getInput(2)
-        img = input_img.getImage()
-        bck = input_bck.getImage()
-        bck_integration = input_bck_integration.getImage()
-        print(img.shape)
-        # resize of the optional bck
-        if input_bck_integration.isDataAvailable():
-            if img.shape != bck_integration.shape:
-                dim = tuple(img[:, :, 0].shape)
-                a, b = dim[0], dim[1]
-                final = b, a
-                bck_integration = cv2.resize(bck_integration, final, interpolation=cv2.INTER_LINEAR)
-
-        # get param
+    # loading of model weights
+    def model_treatment(self):
         param = self.getParam()
-        print("Start BackgroundMatting...")
-
-        # Get output
-        output_composite = self.getOutput(0)
-        output_alpha = self.getOutput(1)
-        output_fgr = self.getOutput(2)
-        output_err = self.getOutput(3)
-        # program run place
-        device_ = param.cuda
-        device = torch.device(device_)
-
-        if device_ == 'cuda' and torch.cuda.is_available() == 0:
-            device_ = 'cpu'
-            device = torch.device(device_)
-            print("cuda is not available on your machine, we pass in cpu")
-
         if self.model is None or param.update is True:
             if param.model_type == 'mattingbase':
                 self.model = MattingBase(backbone=param.model_backbone)
@@ -194,7 +169,9 @@ class BackgroundMattingProcess(core.CProtocolTask):
                     param.model_refine_pixels,
                     param.model_refine_threshold,
                     3)
-            self.model.to(device).eval()
+            self.model.to(self.device).eval()
+
+
             if param.model_backbone == "resnet101":
                 if os.path.isfile(os.path.dirname(__file__) + "/download_model/resnet101.pth"):
                     pass
@@ -204,7 +181,7 @@ class BackgroundMattingProcess(core.CProtocolTask):
 
                 self.model.load_state_dict(
                     torch.load(Path(os.path.dirname(__file__) + "/download_model/resnet101.pth"),
-                               map_location=device), strict=False)
+                               map_location=self.device), strict=False)
 
             elif param.model_backbone == "resnet50":
                 if os.path.isfile(os.path.dirname(__file__) + "/download_model/resnet101.pth"):
@@ -214,7 +191,7 @@ class BackgroundMattingProcess(core.CProtocolTask):
                         os.path.dirname(__file__) + "/download_model/resnet50.pth"))
 
                 self.model.load_state_dict(torch.load(Path(os.path.dirname(__file__) + "/download_model/resnet50.pth"),
-                                                      map_location=device), strict=False)
+                                                      map_location=self.device), strict=False)
 
             else:
                 if os.path.isfile(os.path.dirname(__file__) + "/download_model/mobilenetv2.pth"):
@@ -225,31 +202,69 @@ class BackgroundMattingProcess(core.CProtocolTask):
 
                 self.model.load_state_dict(
                     torch.load(Path(os.path.dirname(__file__) + "/download_model/mobilenetv2.pth"),
-                               map_location=device), strict=False)
+                               map_location=self.device), strict=False)
             param.update = False
 
+    def run(self):
+        # Core function of your process
+        # Call beginTaskRun for initialization
+        self.beginTaskRun()
+        input_img = self.getInput(0)
+        input_bck = self.getInput(1)
+        input_bck_integration = self.getInput(2)
+        img = input_img.getImage()
+        bck = input_bck.getImage()
+        bck_integration = input_bck_integration.getImage()
+        self.emitStepProgress()
+        print("input recovery")
+        # resize of the optional bck
+        if input_bck_integration.isDataAvailable():
+            if img.shape != bck_integration.shape:
+                dim = tuple(img[:, :, 0].shape)
+                a, b = dim[0], dim[1]
+                final = b, a
+                bck_integration = cv2.resize(bck_integration, final, interpolation=cv2.INTER_LINEAR)
+
+        # get param
+        param = self.getParam()
+        print("Start BackgroundMatting...")
+        # Get output
+        output_composite = self.getOutput(0)
+        output_alpha = self.getOutput(1)
+        output_fgr = self.getOutput(2)
+        output_err = self.getOutput(3)
+        self.emitStepProgress()
+        print("output designation")
+
+        self.model_treatment()
+        self.emitStepProgress()
+        print("operating model")
         # conversion loop
         with torch.no_grad():
             # converting values from my arrays to float between 0 and 1 (model format)
             img_np = asarray([img])
-            print(img_np.shape)
             bck_np = asarray([bck])
-            bck_integration_np = asarray([bck_integration])
             img_np = img_np.astype(np.float32)
             bck_np = bck_np.astype(np.float32)
-            bck_integration_np = bck_integration_np.astype(np.float32)
             img_np = img_np / 255
             bck_np = bck_np / 255
-            bck_integration_np = bck_integration_np / 255
-            print(img_np.shape)
             img_np = torch.from_numpy(img_np).permute(0, 3, 1, 2)
             bck_np = torch.from_numpy(bck_np).permute(0, 3, 1, 2)
-            bck_integration_tensor = torch.from_numpy(bck_integration_np).permute(0, 3, 1, 2)
-
+            self.emitStepProgress()
+            print("transformation in tensor ok")
+            # with bck integration
+            if input_bck_integration.isDataAvailable():
+                bck_integration_np = asarray([bck_integration])
+                bck_integration_np = bck_integration_np.astype(np.float32)
+                bck_integration_np = bck_integration_np / 255
+                bck_integration_tensor = torch.from_numpy(bck_integration_np).permute(0, 3, 1, 2)
+                bck_integration_tensor = bck_integration_tensor.to(self.device, non_blocking=True)
             # passing our data into the model
-            src = img_np.to(device, non_blocking=True)
-            bgr = bck_np.to(device, non_blocking=True)
-            bck_integration_tensor = bck_integration_tensor.to(device, non_blocking=True)
+            src = img_np.to(self.device, non_blocking=True)
+            bgr = bck_np.to(self.device, non_blocking=True)
+
+            self.emitStepProgress()
+            print("passing the data in the model")
             if param.model_type == 'mattingbase':
                 alpha, fgr, err, hid = self.model(src, bgr)
             elif param.model_type == 'mattingrefine':
@@ -268,7 +283,8 @@ class BackgroundMattingProcess(core.CProtocolTask):
             output_err_npy = output_err_npy[0, :, :, :]
             output_composite_npy = output_composite_npy[0, :, :, :]
             output_alpha_npy = output_alpha_npy[0, :, :, :]
-
+            self.emitStepProgress()
+            print("output recovery")
             # background integration
             if input_bck_integration.isDataAvailable():
                 output_composite_f = fgr * alpha + bck_integration_tensor * (1 - alpha)
@@ -282,7 +298,6 @@ class BackgroundMattingProcess(core.CProtocolTask):
             output_err.setImage(output_err_npy)
             output_fgr.setImage(output_fgr_npy)
             output_alpha.setImage(output_alpha_npy)
-
             print("End of the process...")
 
         # Step progress bar:
@@ -334,3 +349,4 @@ class BackgroundMattingProcessFactory(dataprocess.CProcessFactory):
     def create(self, param=None):
         # Create process object
         return BackgroundMattingProcess(self.info.name, param)
+

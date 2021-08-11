@@ -104,7 +104,7 @@ class BackgroundMattingWidget(core.CProtocolTaskWidget):
         self.model_refine_pixels.setValue(self.parameters.model_refine_pixels)
 
         # Creation widget use_cuda
-        self.label_model_Cuda = QLabel("use cuda:")
+        self.label_model_Cuda = QLabel("Application on:")
         self.cuda = QComboBox()
         self.cuda.addItem("cuda")
         self.cuda.addItem("cpu")
