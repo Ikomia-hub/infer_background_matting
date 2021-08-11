@@ -232,24 +232,25 @@ class BackgroundMattingProcess(core.CProtocolTask):
         with torch.no_grad():
             # converting values from my arrays to float between 0 and 1 (model format)
             img_np = asarray([img])
-            print(img_np.shape)
             bck_np = asarray([bck])
-            bck_integration_np = asarray([bck_integration])
             img_np = img_np.astype(np.float32)
             bck_np = bck_np.astype(np.float32)
-            bck_integration_np = bck_integration_np.astype(np.float32)
             img_np = img_np / 255
             bck_np = bck_np / 255
-            bck_integration_np = bck_integration_np / 255
-            print(img_np.shape)
             img_np = torch.from_numpy(img_np).permute(0, 3, 1, 2)
             bck_np = torch.from_numpy(bck_np).permute(0, 3, 1, 2)
-            bck_integration_tensor = torch.from_numpy(bck_integration_np).permute(0, 3, 1, 2)
 
+            # with bck integration
+            if input_bck_integration.isDataAvailable():
+                bck_integration_np = asarray([bck_integration])
+                bck_integration_np = bck_integration_np.astype(np.float32)
+                bck_integration_np = bck_integration_np / 255
+                bck_integration_tensor = torch.from_numpy(bck_integration_np).permute(0, 3, 1, 2)
+                bck_integration_tensor = bck_integration_tensor.to(device, non_blocking=True)
             # passing our data into the model
             src = img_np.to(device, non_blocking=True)
             bgr = bck_np.to(device, non_blocking=True)
-            bck_integration_tensor = bck_integration_tensor.to(device, non_blocking=True)
+
             if param.model_type == 'mattingbase':
                 alpha, fgr, err, hid = self.model(src, bgr)
             elif param.model_type == 'mattingrefine':
