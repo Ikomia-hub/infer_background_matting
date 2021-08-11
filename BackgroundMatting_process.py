@@ -123,7 +123,7 @@ class BackgroundMattingProcess(core.CProtocolTask):
     def getProgressSteps(self, eltCount=7):
         # Function returning the number of progress steps for this process
         # This is handled by the main progress bar of Ikomia application
-        return 7
+        return 1
 
     # function to download model on google drive
     def download_file_from_google_drive(self, id, destination):
