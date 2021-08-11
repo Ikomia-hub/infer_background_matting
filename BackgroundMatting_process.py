@@ -195,6 +195,10 @@ class BackgroundMattingProcess(core.CProtocolTask):
                     param.model_refine_threshold,
                     3)
             self.model.to(device).eval()
+
+            newpath = os.path.dirname(__file__) + "/download_model"
+            if not os.path.exists(newpath):
+                os.makedirs(newpath)
             if param.model_backbone == "resnet101":
                 if os.path.isfile(os.path.dirname(__file__) + "/download_model/resnet101.pth"):
                     pass
