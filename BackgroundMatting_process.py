@@ -120,10 +120,10 @@ class BackgroundMattingProcess(core.CProtocolTask):
             self.device = torch.device(self.device_)
             print("cuda is not available on your machine, we pass in cpu")
 
-    def getProgressSteps(self, eltCount=7):
+    def getProgressSteps(self, eltCount=1):
         # Function returning the number of progress steps for this process
         # This is handled by the main progress bar of Ikomia application
-        return 1
+        return 7
 
     # function to download model on google drive
     def download_file_from_google_drive(self, id, destination):
@@ -216,7 +216,7 @@ class BackgroundMattingProcess(core.CProtocolTask):
         bck = input_bck.getImage()
         bck_integration = input_bck_integration.getImage()
         self.emitStepProgress()
-        print("input recovery")
+        # print("input recovery")
         # resize of the optional bck
         if input_bck_integration.isDataAvailable():
             if img.shape != bck_integration.shape:
@@ -227,18 +227,18 @@ class BackgroundMattingProcess(core.CProtocolTask):
 
         # get param
         param = self.getParam()
-        print("Start BackgroundMatting...")
+        # print("Start BackgroundMatting...")
         # Get output
         output_composite = self.getOutput(0)
         output_alpha = self.getOutput(1)
         output_fgr = self.getOutput(2)
         output_err = self.getOutput(3)
         self.emitStepProgress()
-        print("output designation")
+        # print("output designation")
 
         self.model_treatment()
         self.emitStepProgress()
-        print("operating model")
+        # print("operating model")
         # conversion loop
         with torch.no_grad():
             # converting values from my arrays to float between 0 and 1 (model format)
@@ -251,7 +251,7 @@ class BackgroundMattingProcess(core.CProtocolTask):
             img_np = torch.from_numpy(img_np).permute(0, 3, 1, 2)
             bck_np = torch.from_numpy(bck_np).permute(0, 3, 1, 2)
             self.emitStepProgress()
-            print("transformation in tensor ok")
+            # print("transformation in tensor ok")
             # with bck integration
             if input_bck_integration.isDataAvailable():
                 bck_integration_np = asarray([bck_integration])
@@ -264,7 +264,7 @@ class BackgroundMattingProcess(core.CProtocolTask):
             bgr = bck_np.to(self.device, non_blocking=True)
 
             self.emitStepProgress()
-            print("passing the data in the model")
+            # print("passing the data in the model")
             if param.model_type == 'mattingbase':
                 alpha, fgr, err, hid = self.model(src, bgr)
             elif param.model_type == 'mattingrefine':
@@ -284,7 +284,7 @@ class BackgroundMattingProcess(core.CProtocolTask):
             output_composite_npy = output_composite_npy[0, :, :, :]
             output_alpha_npy = output_alpha_npy[0, :, :, :]
             self.emitStepProgress()
-            print("output recovery")
+            # print("output recovery")
             # background integration
             if input_bck_integration.isDataAvailable():
                 output_composite_f = fgr * alpha + bck_integration_tensor * (1 - alpha)
@@ -298,7 +298,7 @@ class BackgroundMattingProcess(core.CProtocolTask):
             output_err.setImage(output_err_npy)
             output_fgr.setImage(output_fgr_npy)
             output_alpha.setImage(output_alpha_npy)
-            print("End of the process...")
+            # print("End of the process...")
 
         # Step progress bar:
         self.emitStepProgress()
