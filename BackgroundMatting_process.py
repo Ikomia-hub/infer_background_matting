@@ -17,12 +17,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from ikomia import core, dataprocess
-import copy, torch, requests, cv2
+import copy
+import requests
+import cv2
 from torch.nn.modules.module import *
 from torch.nn import functional as F
 from pathlib import Path
 from numpy import asarray
-from model.model import MattingBase, MattingRefine
+from BackgroundMatting.model.model import MattingBase, MattingRefine
 import numpy as np
 import os
 
@@ -31,10 +33,10 @@ import os
 # - Class to handle the process parameters
 # - Inherits PyCore.CProtocolTaskParam from Ikomia API
 # --------------------
-class BackgroundMattingParam(core.CProtocolTaskParam):
+class BackgroundMattingParam(core.CWorkflowTaskParam):
 
     def __init__(self):
-        core.CProtocolTaskParam.__init__(self)
+        core.CWorkflowTaskParam.__init__(self)
         self.model_type = "mattingrefine"
         self.model_backbone = "mobilenetv2"
         self.model_backbone_scale = 0.25
@@ -45,51 +47,51 @@ class BackgroundMattingParam(core.CProtocolTaskParam):
         self.cuda = 'cuda'
         self.update = False
 
-    def setParamMap(self, paramMap):
-        self.model_type = paramMap["model_type"]
-        self.model_backbone = paramMap["model_backbone"]
-        self.cuda = paramMap["cuda"]
-        self.model_backbone_scale = int(paramMap["model_backbone"])
-        self.model_refine_threshold = int(paramMap["model_refine_threshold"])
-        self.model_refine_mode = paramMap["model_refine_mode"]
-        self.model_refine_pixels = int(paramMap["model_refine_pixels"])
-        self.kernel_size = int(paramMap["kernel_size"])
-        self.update = int(paramMap["update"])
+    def setParamMap(self, param_map):
+        self.model_type = param_map["model_type"]
+        self.model_backbone = param_map["model_backbone"]
+        self.cuda = param_map["cuda"]
+        self.model_backbone_scale = int(param_map["model_backbone"])
+        self.model_refine_threshold = int(param_map["model_refine_threshold"])
+        self.model_refine_mode = param_map["model_refine_mode"]
+        self.model_refine_pixels = int(param_map["model_refine_pixels"])
+        self.kernel_size = int(param_map["kernel_size"])
+        self.update = int(param_map["update"])
 
     def getParamMap(self):
-        paramMap = core.ParamMap()
-        paramMap["model_type"] = self.model_type
-        paramMap["model_backbone"] = self.model_backbone
-        paramMap["cuda"] = self.cuda
-        paramMap["model_refine_mode"] = self.model_refine_mode
-        paramMap["model_backbone_scale"] = str(self.model_backbone_scale)
-        paramMap["model_refine_threshold"] = str(self.model_refine_threshold)
-        paramMap["model_refine_pixels"] = str(self.model_refine_pixels)
-        paramMap["kernel_size"] = str(self.kernel_size)
-        paramMap["update"] = str(self.update)
-        return paramMap
+        param_map = core.ParamMap()
+        param_map["model_type"] = self.model_type
+        param_map["model_backbone"] = self.model_backbone
+        param_map["cuda"] = self.cuda
+        param_map["model_refine_mode"] = self.model_refine_mode
+        param_map["model_backbone_scale"] = str(self.model_backbone_scale)
+        param_map["model_refine_threshold"] = str(self.model_refine_threshold)
+        param_map["model_refine_pixels"] = str(self.model_refine_pixels)
+        param_map["kernel_size"] = str(self.kernel_size)
+        param_map["update"] = str(self.update)
+        return param_map
 
 
 # --------------------
 # - Class which implements the process
 # - Inherits PyCore.CProtocolTask or derived from Ikomia API
 # --------------------
-class BackgroundMattingProcess(core.CProtocolTask):
+class BackgroundMattingProcess(core.CWorkflowTask):
 
     def __init__(self, name, param):
-        core.CProtocolTask.__init__(self, name)
+        core.CWorkflowTask.__init__(self, name)
         # Add input/output of the process here
-        input_img = dataprocess.CImageProcessIO()
+        input_img = dataprocess.CImageIO()
         input_img.description = "Img - " + input_img.description
-        input_bck = dataprocess.CImageProcessIO()
+        input_bck = dataprocess.CImageIO()
         input_bck.description = "Bck - " + input_bck.description
-        input_optional_bck = dataprocess.CImageProcessIO()
+        input_optional_bck = dataprocess.CImageIO()
         input_optional_bck.description = "Bck to integrate on the image - " + input_optional_bck.description
 
-        output_composite = dataprocess.CImageProcessIO()
-        output_alpha = dataprocess.CImageProcessIO()
-        output_fgr = dataprocess.CImageProcessIO()
-        output_err = dataprocess.CImageProcessIO()
+        output_composite = dataprocess.CImageIO()
+        output_alpha = dataprocess.CImageIO()
+        output_fgr = dataprocess.CImageIO()
+        output_err = dataprocess.CImageIO()
         output_composite.description = "Composite output - " + output_composite.description
         output_alpha.description = "Alpha output - " + output_alpha.description
         output_fgr.description = "Foreground output - " + output_fgr.description
@@ -170,7 +172,6 @@ class BackgroundMattingProcess(core.CProtocolTask):
                     param.model_refine_threshold,
                     3)
             self.model.to(self.device).eval()
-
 
             if param.model_backbone == "resnet101":
                 if os.path.isfile(os.path.dirname(__file__) + "/download_model/resnet101.pth"):
@@ -311,10 +312,10 @@ class BackgroundMattingProcess(core.CProtocolTask):
 # - Factory class to build process object
 # - Inherits PyDataProcess.CProcessFactory from Ikomia API
 # --------------------
-class BackgroundMattingProcessFactory(dataprocess.CProcessFactory):
+class BackgroundMattingProcessFactory(dataprocess.CTaskFactory):
 
     def __init__(self):
-        dataprocess.CProcessFactory.__init__(self)
+        dataprocess.CTaskFactory.__init__(self)
         # Set process information as string here
         self.info.name = "BackgroundMatting"
         self.info.shortDescription = "Real-Time High-Resolution Background Matting"

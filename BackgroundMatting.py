@@ -17,8 +17,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from ikomia import dataprocess
-import BackgroundMatting_process as processMod
-import BackgroundMatting_widget as widgetMod
 
 
 # --------------------
@@ -31,9 +29,11 @@ class BackgroundMatting(dataprocess.CPluginProcessInterface):
         dataprocess.CPluginProcessInterface.__init__(self)
 
     def getProcessFactory(self):
+        from BackgroundMatting.BackgroundMatting_process import BackgroundMattingProcessFactory
         # Instantiate process object
-        return processMod.BackgroundMattingProcessFactory()
+        return BackgroundMattingProcessFactory()
 
     def getWidgetFactory(self):
+        from BackgroundMatting.BackgroundMatting_widget import BackgroundMattingWidgetFactory
         # Instantiate associated widget object
-        return widgetMod.BackgroundMattingWidgetFactory()
+        return BackgroundMattingWidgetFactory()
