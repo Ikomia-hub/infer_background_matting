@@ -349,5 +349,5 @@ class InferBckMattingFactory(dataprocess.CTaskFactory):
 
     def create(self, param=None):
         # Create process object
-        return InferBckMattingProcess(self.info.name, param)
+        return InferBckMatting(self.info.name, param)
 
