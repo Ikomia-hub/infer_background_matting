@@ -1,4 +1,4 @@
---find-links https://download.pytorch.org/whl/cu101/torch_stable.html
+--find-links https://download.pytorch.org/whl/cu111/torch_stable.html
 Cython
 kornia==0.5.6
 tensorboard==2.5.0
