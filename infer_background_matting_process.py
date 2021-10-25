@@ -332,7 +332,7 @@ class InferBckMattingFactory(dataprocess.CTaskFactory):
         self.info.authors = "Shanchuan Lin, Andrey Ryabtsev, Soumyadip Sengupta, Brian Curless, Steve Seitz, " \
                             "Ira Kemelmacher-Shlizerman"
         # relative path -> as displayed in Ikomia application process tree
-        self.info.path = "Plugins/Python"
+        self.info.path = "Plugins/Python/Background"
         self.info.version = "1.0.0"
         # self.info.iconPath = "your path to a specific icon"
         self.info.article = "Real-Time High-Resolution Background Matting"
