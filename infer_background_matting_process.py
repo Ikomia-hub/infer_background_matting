@@ -122,7 +122,7 @@ class InferBckMatting(core.CWorkflowTask):
             self.device = torch.device(self.device_)
             print("cuda is not available on your machine, we pass in cpu")
 
-    def getProgressSteps(self, eltCount=1):
+    def getProgressSteps(self):
         # Function returning the number of progress steps for this process
         # This is handled by the main progress bar of Ikomia application
         return 7
