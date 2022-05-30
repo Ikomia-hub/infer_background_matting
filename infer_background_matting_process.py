@@ -128,28 +128,18 @@ class InferBckMatting(core.CWorkflowTask):
         return 7
 
     # function to download model on google drive
-    def download_file_from_google_drive(self, id, destination):
-        path = os.path.dirname(__file__) + "/download_model"
+    def download_file_from_google_drive(self, file_id, destination):
+        path = os.path.join(os.path.dirname(__file__), "download_model")
         if not os.path.exists(path):
             os.makedirs(path)
-        URL = "https://docs.google.com/uc?export=download"
-        session = requests.Session()
 
-        response = session.get(URL, params={'id': id}, stream=True)
-        token = self.get_confirm_token(response)
-        if token:
-            params = {'id': id, 'confirm': token}
-            response = session.get(URL, params=params, stream=True)
+        url = "https://docs.google.com/uc?export=download"
+        session = requests.Session()
+        response = session.get(url, params={'id': file_id, "confirm": "t"}, stream=True)
         self.save_response_content(response, destination)
 
-    def get_confirm_token(self, response):
-        for key, value in response.cookies.items():
-            if key.startswith('download_warning'):
-                return value
-
-        return None
-
-    def save_response_content(self, response, destination):
+    @staticmethod
+    def save_response_content(response, destination):
         CHUNK_SIZE = 32768
 
         with open(destination, "wb") as f:
@@ -163,7 +153,7 @@ class InferBckMatting(core.CWorkflowTask):
         if self.model is None or param.update is True:
             if param.model_type == 'mattingbase':
                 self.model = MattingBase(backbone=param.model_backbone)
-            if param.model_type == 'mattingrefine':
+            elif param.model_type == 'mattingrefine':
                 self.model = MattingRefine(
                     param.model_backbone,
                     param.model_backbone_scale,
@@ -171,39 +161,30 @@ class InferBckMatting(core.CWorkflowTask):
                     param.model_refine_pixels,
                     param.model_refine_threshold,
                     3)
+
             self.model.to(self.device).eval()
 
             if param.model_backbone == "resnet101":
-                if os.path.isfile(os.path.dirname(__file__) + "/download_model/resnet101.pth"):
-                    pass
-                else:
-                    self.download_file_from_google_drive("1zysR-jW6jydA2zkWfevxD1JpQHglKG1_", Path(
-                        os.path.dirname(__file__) + "/download_model/resnet101.pth"))
+                model_path = os.path.join(os.path.dirname(__file__), "download_model", "resnet101.pth")
+                if not os.path.isfile(model_path):
+                    self.download_file_from_google_drive("1zysR-jW6jydA2zkWfevxD1JpQHglKG1_", model_path)
 
-                self.model.load_state_dict(
-                    torch.load(Path(os.path.dirname(__file__) + "/download_model/resnet101.pth"),
-                               map_location=self.device), strict=False)
+                self.model.load_state_dict(torch.load(model_path, map_location=self.device), strict=False)
 
             elif param.model_backbone == "resnet50":
-                if os.path.isfile(os.path.dirname(__file__) + "/download_model/resnet101.pth"):
-                    pass
-                else:
-                    self.download_file_from_google_drive("1ErIAsB_miVhYL9GDlYUmfbqlV293mSYf", Path(
-                        os.path.dirname(__file__) + "/download_model/resnet50.pth"))
+                model_path = os.path.join(os.path.dirname(__file__), "download_model", "resnet50.pth")
+                if not os.path.isfile(model_path):
+                    self.download_file_from_google_drive("1ErIAsB_miVhYL9GDlYUmfbqlV293mSYf", model_path)
 
-                self.model.load_state_dict(torch.load(Path(os.path.dirname(__file__) + "/download_model/resnet50.pth"),
-                                                      map_location=self.device), strict=False)
+                self.model.load_state_dict(torch.load(model_path, map_location=self.device), strict=False)
 
             else:
-                if os.path.isfile(os.path.dirname(__file__) + "/download_model/mobilenetv2.pth"):
-                    pass
-                else:
-                    self.download_file_from_google_drive("1b2FQH0yULaiBwe4ORUvSxXpdWLipjLsI", Path(
-                        os.path.dirname(__file__) + "/download_model/mobilenetv2.pth"))
+                model_path = os.path.join(os.path.dirname(__file__), "download_model", "mobilenetv2.pth")
+                if not os.path.isfile(model_path):
+                    self.download_file_from_google_drive("1b2FQH0yULaiBwe4ORUvSxXpdWLipjLsI", model_path)
 
-                self.model.load_state_dict(
-                    torch.load(Path(os.path.dirname(__file__) + "/download_model/mobilenetv2.pth"),
-                               map_location=self.device), strict=False)
+                self.model.load_state_dict(torch.load(model_path, map_location=self.device), strict=False)
+
             param.update = False
 
     def run(self):
@@ -217,7 +198,7 @@ class InferBckMatting(core.CWorkflowTask):
         bck = input_bck.getImage()
         bck_integration = input_bck_integration.getImage()
         self.emitStepProgress()
-        # print("input recovery")
+
         # resize of the optional bck
         if input_bck_integration.isDataAvailable():
             if img.shape != bck_integration.shape:
@@ -226,20 +207,18 @@ class InferBckMatting(core.CWorkflowTask):
                 final = b, a
                 bck_integration = cv2.resize(bck_integration, final, interpolation=cv2.INTER_LINEAR)
 
-        # get param
+        # Get parameters
         param = self.getParam()
-        # print("Start BackgroundMatting...")
         # Get output
         output_composite = self.getOutput(0)
         output_alpha = self.getOutput(1)
         output_fgr = self.getOutput(2)
         output_err = self.getOutput(3)
         self.emitStepProgress()
-        # print("output designation")
 
         self.model_treatment()
         self.emitStepProgress()
-        # print("operating model")
+
         # conversion loop
         with torch.no_grad():
             # converting values from my arrays to float between 0 and 1 (model format)
@@ -252,7 +231,7 @@ class InferBckMatting(core.CWorkflowTask):
             img_np = torch.from_numpy(img_np).permute(0, 3, 1, 2)
             bck_np = torch.from_numpy(bck_np).permute(0, 3, 1, 2)
             self.emitStepProgress()
-            # print("transformation in tensor ok")
+
             # with bck integration
             if input_bck_integration.isDataAvailable():
                 bck_integration_np = asarray([bck_integration])
@@ -260,16 +239,17 @@ class InferBckMatting(core.CWorkflowTask):
                 bck_integration_np = bck_integration_np / 255
                 bck_integration_tensor = torch.from_numpy(bck_integration_np).permute(0, 3, 1, 2)
                 bck_integration_tensor = bck_integration_tensor.to(self.device, non_blocking=True)
+
             # passing our data into the model
             src = img_np.to(self.device, non_blocking=True)
             bgr = bck_np.to(self.device, non_blocking=True)
-
             self.emitStepProgress()
-            # print("passing the data in the model")
+
             if param.model_type == 'mattingbase':
                 alpha, fgr, err, hid = self.model(src, bgr)
             elif param.model_type == 'mattingrefine':
                 alpha, fgr, _, _, err, ref = self.model(src, bgr)
+
             composite = torch.cat([fgr * alpha.ne(0), alpha], dim=1)
             err = F.interpolate(err, src.shape[2:], mode='bilinear', align_corners=False)
 
@@ -285,12 +265,11 @@ class InferBckMatting(core.CWorkflowTask):
             output_composite_npy = output_composite_npy[0, :, :, :]
             output_alpha_npy = output_alpha_npy[0, :, :, :]
             self.emitStepProgress()
-            # print("output recovery")
+
             # background integration
             if input_bck_integration.isDataAvailable():
                 output_composite_f = fgr * alpha + bck_integration_tensor * (1 - alpha)
-                output_composite_inter = (output_composite_f.permute(0, 2, 3, 1).cpu().numpy() * 255).astype("uint8")[0,
-                                         :, :, :]
+                output_composite_inter = (output_composite_f.permute(0, 2, 3, 1).cpu().numpy() * 255).astype("uint8")[0, :, :, :]
                 output_composite.setImage(output_composite_inter)
             else:
                 output_composite.setImage(output_composite_npy)
@@ -299,7 +278,6 @@ class InferBckMatting(core.CWorkflowTask):
             output_err.setImage(output_err_npy)
             output_fgr.setImage(output_fgr_npy)
             output_alpha.setImage(output_alpha_npy)
-            # print("End of the process...")
 
         # Step progress bar:
         self.emitStepProgress()
@@ -333,7 +311,7 @@ class InferBckMattingFactory(dataprocess.CTaskFactory):
                             "Ira Kemelmacher-Shlizerman"
         # relative path -> as displayed in Ikomia application process tree
         self.info.path = "Plugins/Python/Background"
-        self.info.version = "1.0.0"
+        self.info.version = "1.0.1"
         # self.info.iconPath = "your path to a specific icon"
         self.info.article = "Real-Time High-Resolution Background Matting"
         self.info.journal = "publication journal"
