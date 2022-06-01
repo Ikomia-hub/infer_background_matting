@@ -197,6 +197,15 @@ class InferBckMatting(core.CWorkflowTask):
         input_bck_integration = self.getInput(2)
         img = input_img.getImage()
         bck = input_bck.getImage()
+        h, w = np.shape(img)[:2]
+        # height and width of input image must be divisible by 4
+        if h % 4 != 0 or w % 4 != 0:
+            h, w = h // 4 * 4, w // 4 * 4
+            img = cv2.resize(img, (w, h), interpolation=cv2.INTER_LINEAR)
+
+        if bck.shape != img.shape:
+            bck = cv2.resize(bck, (w, h), interpolation=cv2.INTER_LINEAR)
+
         bck_integration = input_bck_integration.getImage()
         self.emitStepProgress()
 
