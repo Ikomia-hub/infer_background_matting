@@ -150,7 +150,7 @@ class InferBckMatting(core.CWorkflowTask):
     # loading of model weights
     def model_treatment(self):
         param = self.getParam()
-        if self.model is None or param.update is True:
+        if self.model is None or param.update:
             if param.model_type == 'mattingbase':
                 self.model = MattingBase(backbone=param.model_backbone)
             elif param.model_type == 'mattingrefine':
