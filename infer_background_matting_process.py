@@ -27,6 +27,7 @@ from numpy import asarray
 from infer_background_matting.model.model import MattingBase, MattingRefine
 import numpy as np
 import os
+from distutils.util import strtobool
 
 
 # --------------------
