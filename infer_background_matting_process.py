@@ -279,7 +279,8 @@ class InferBckMatting(core.CWorkflowTask):
             # background integration
             if input_bck_integration.isDataAvailable():
                 output_composite_f = fgr * alpha + bck_integration_tensor * (1 - alpha)
-                output_composite_inter = (output_composite_f.permute(0, 2, 3, 1).cpu().numpy() * 255).astype("uint8")[0, :, :, :]
+                output_composite_inter = (output_composite_f.permute(0, 2, 3, 1).cpu().numpy() * 255).astype("uint8")[0,
+                                         :, :, :]
                 output_composite.setImage(output_composite_inter)
             else:
                 output_composite.setImage(output_composite_npy)
