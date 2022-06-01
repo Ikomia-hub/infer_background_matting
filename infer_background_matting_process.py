@@ -51,12 +51,12 @@ class InferBckMattingParam(core.CWorkflowTaskParam):
         self.model_type = param_map["model_type"]
         self.model_backbone = param_map["model_backbone"]
         self.cuda = param_map["cuda"]
-        self.model_backbone_scale = int(param_map["model_backbone"])
-        self.model_refine_threshold = int(param_map["model_refine_threshold"])
+        self.model_backbone_scale = float(param_map["model_backbone_scale"])
+        self.model_refine_threshold = float(param_map["model_refine_threshold"])
         self.model_refine_mode = param_map["model_refine_mode"]
         self.model_refine_pixels = int(param_map["model_refine_pixels"])
         self.kernel_size = int(param_map["kernel_size"])
-        self.update = int(param_map["update"])
+        self.update = strtobool(param_map["update"])
 
     def getParamMap(self):
         param_map = core.ParamMap()
