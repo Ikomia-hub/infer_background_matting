@@ -2,6 +2,8 @@ import logging
 import cv2
 import numpy as np
 from ikomia.core import task
+from ikomia.utils.tests import run_for_test
+
 
 logger = logging.getLogger(__name__)
 
@@ -24,4 +26,4 @@ def test(t, data_dict):
             # without update = 1, model is not updated between two tests
             params["update"] = 1
             task.set_parameters(t, params)
-            t.run()
+            yield run_for_test(t)
