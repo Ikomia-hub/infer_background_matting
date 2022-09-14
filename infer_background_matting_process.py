@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from ikomia import core, dataprocess
+from ikomia import utils, core, dataprocess
 import copy
 import requests
 import cv2
@@ -27,7 +27,6 @@ from numpy import asarray
 from infer_background_matting.model.model import MattingBase, MattingRefine
 import numpy as np
 import os
-from distutils.util import strtobool
 
 
 # --------------------
@@ -57,7 +56,7 @@ class InferBckMattingParam(core.CWorkflowTaskParam):
         self.model_refine_mode = param_map["model_refine_mode"]
         self.model_refine_pixels = int(param_map["model_refine_pixels"])
         self.kernel_size = int(param_map["kernel_size"])
-        self.update = strtobool(param_map["update"])
+        self.update = utils.strtobool(param_map["update"])
 
     def getParamMap(self):
         param_map = core.ParamMap()
