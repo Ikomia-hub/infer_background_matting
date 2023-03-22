@@ -28,12 +28,12 @@ class IkomiaPlugin(dataprocess.CPluginProcessInterface):
     def __init__(self):
         dataprocess.CPluginProcessInterface.__init__(self)
 
-    def getProcessFactory(self):
+    def get_process_factory(self):
         from infer_background_matting.infer_background_matting_process import InferBckMattingFactory
         # Instantiate process object
         return InferBckMattingFactory()
 
-    def getWidgetFactory(self):
+    def get_widget_factory(self):
         from infer_background_matting.infer_background_matting_widget import InferBckMattingWidgetFactory
         # Instantiate associated widget object
         return InferBckMattingWidgetFactory()

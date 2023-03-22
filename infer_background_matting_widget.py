@@ -43,7 +43,7 @@ class InferBckMattingWidget(core.CWorkflowTaskWidget):
         layout_ptr = qtconversion.PyQtToQt(self.grid_layout)
 
         # Set widget layout
-        self.setLayout(layout_ptr)
+        self.set_layout(layout_ptr)
         # Creation widget model_type
         self.label_model = QLabel("Model_type:")
         self.model_type = QComboBox()
@@ -129,7 +129,7 @@ class InferBckMattingWidget(core.CWorkflowTaskWidget):
             self.label_model_refine_threshold.hide()
             self.model_refine_threshold.hide()
 
-    def onApply(self):
+    def on_apply(self):
         self.parameters.model_type = self.model_type.currentText()
         self.parameters.model_backbone = self.model_backbone.currentText()
         self.parameters.model_refine_mode = self.model_refine_mode.currentText()
@@ -138,7 +138,7 @@ class InferBckMattingWidget(core.CWorkflowTaskWidget):
         self.parameters.model_refine_threshold = self.model_refine_threshold.value()
         self.parameters.model_refine_pixels = self.model_refine_pixels.value()
         self.parameters.update = True
-        self.emitApply(self.parameters)
+        self.emit_apply(self.parameters)
 
 
 # --------------------

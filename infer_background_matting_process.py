@@ -47,7 +47,7 @@ class InferBckMattingParam(core.CWorkflowTaskParam):
         self.cuda = 'cuda'
         self.update = False
 
-    def setParamMap(self, param_map):
+    def set_values(self, param_map):
         self.model_type = param_map["model_type"]
         self.model_backbone = param_map["model_backbone"]
         self.cuda = param_map["cuda"]
@@ -58,8 +58,8 @@ class InferBckMattingParam(core.CWorkflowTaskParam):
         self.kernel_size = int(param_map["kernel_size"])
         self.update = utils.strtobool(param_map["update"])
 
-    def getParamMap(self):
-        param_map = core.ParamMap()
+    def get_values(self):
+        param_map = {}
         param_map["model_type"] = self.model_type
         param_map["model_backbone"] = self.model_backbone
         param_map["cuda"] = self.cuda
@@ -96,23 +96,23 @@ class InferBckMatting(core.CWorkflowTask):
         output_alpha.description = "Alpha output - " + output_alpha.description
         output_fgr.description = "Foreground output - " + output_fgr.description
         output_err.description = "Error output - " + output_err.description
-        self.addInput(input_img)
-        self.addInput(input_bck)
-        self.addInput(input_optional_bck)
-        self.addOutput(output_composite)
-        self.addOutput(output_alpha)
-        self.addOutput(output_fgr)
-        self.addOutput(output_err)
+        self.add_input(input_img)
+        self.add_input(input_bck)
+        self.add_input(input_optional_bck)
+        self.add_output(output_composite)
+        self.add_output(output_alpha)
+        self.add_output(output_fgr)
+        self.add_output(output_err)
 
         self.model = None
 
         # Create parameters class
         if param is None:
-            self.setParam(InferBckMattingParam())
+            self.set_param_object(InferBckMattingParam())
         else:
-            self.setParam(copy.deepcopy(param))
+            self.set_param_object(copy.deepcopy(param))
 
-        param = self.getParam()
+        param = self.get_param_object()
         # program run place
         self.device_ = param.cuda
         self.device = torch.device(self.device_)
@@ -122,7 +122,7 @@ class InferBckMatting(core.CWorkflowTask):
             self.device = torch.device(self.device_)
             print("cuda is not available on your machine, we pass in cpu")
 
-    def getProgressSteps(self):
+    def get_progress_steps(self):
         # Function returning the number of progress steps for this process
         # This is handled by the main progress bar of Ikomia application
         return 7
@@ -149,7 +149,7 @@ class InferBckMatting(core.CWorkflowTask):
 
     # loading of model weights
     def model_treatment(self):
-        param = self.getParam()
+        param = self.get_param_object()
         if self.model is None or param.update:
             if param.model_type == 'mattingbase':
                 self.model = MattingBase(backbone=param.model_backbone)
@@ -189,13 +189,13 @@ class InferBckMatting(core.CWorkflowTask):
 
     def run(self):
         # Core function of your process
-        # Call beginTaskRun for initialization
-        self.beginTaskRun()
-        input_img = self.getInput(0)
-        input_bck = self.getInput(1)
-        input_bck_integration = self.getInput(2)
-        img = input_img.getImage()
-        bck = input_bck.getImage()
+        # Call begin_task_run for initialization
+        self.begin_task_run()
+        input_img = self.get_input(0)
+        input_bck = self.get_input(1)
+        input_bck_integration = self.get_input(2)
+        img = input_img.get_image()
+        bck = input_bck.get_image()
         h, w = np.shape(img)[:2]
         # height and width of input image must be divisible by 4
         if h % 4 != 0 or w % 4 != 0:
@@ -205,11 +205,11 @@ class InferBckMatting(core.CWorkflowTask):
         if bck.shape != img.shape:
             bck = cv2.resize(bck, (w, h), interpolation=cv2.INTER_LINEAR)
 
-        bck_integration = input_bck_integration.getImage()
-        self.emitStepProgress()
+        bck_integration = input_bck_integration.get_image()
+        self.emit_step_progress()
 
         # resize of the optional bck
-        if input_bck_integration.isDataAvailable():
+        if input_bck_integration.is_data_available():
             if img.shape != bck_integration.shape:
                 dim = tuple(img[:, :, 0].shape)
                 a, b = dim[0], dim[1]
@@ -217,16 +217,16 @@ class InferBckMatting(core.CWorkflowTask):
                 bck_integration = cv2.resize(bck_integration, final, interpolation=cv2.INTER_LINEAR)
 
         # Get parameters
-        param = self.getParam()
+        param = self.get_param_object()
         # Get output
-        output_composite = self.getOutput(0)
-        output_alpha = self.getOutput(1)
-        output_fgr = self.getOutput(2)
-        output_err = self.getOutput(3)
-        self.emitStepProgress()
+        output_composite = self.get_output(0)
+        output_alpha = self.get_output(1)
+        output_fgr = self.get_output(2)
+        output_err = self.get_output(3)
+        self.emit_step_progress()
 
         self.model_treatment()
-        self.emitStepProgress()
+        self.emit_step_progress()
 
         # conversion loop
         with torch.no_grad():
@@ -239,10 +239,10 @@ class InferBckMatting(core.CWorkflowTask):
             bck_np = bck_np / 255
             img_np = torch.from_numpy(img_np).permute(0, 3, 1, 2)
             bck_np = torch.from_numpy(bck_np).permute(0, 3, 1, 2)
-            self.emitStepProgress()
+            self.emit_step_progress()
 
             # with bck integration
-            if input_bck_integration.isDataAvailable():
+            if input_bck_integration.is_data_available():
                 bck_integration_np = asarray([bck_integration])
                 bck_integration_np = bck_integration_np.astype(np.float32)
                 bck_integration_np = bck_integration_np / 255
@@ -252,7 +252,7 @@ class InferBckMatting(core.CWorkflowTask):
             # passing our data into the model
             src = img_np.to(self.device, non_blocking=True)
             bgr = bck_np.to(self.device, non_blocking=True)
-            self.emitStepProgress()
+            self.emit_step_progress()
 
             if param.model_type == 'mattingbase':
                 alpha, fgr, err, hid = self.model(src, bgr)
@@ -273,27 +273,27 @@ class InferBckMatting(core.CWorkflowTask):
             output_err_npy = output_err_npy[0, :, :, :]
             output_composite_npy = output_composite_npy[0, :, :, :]
             output_alpha_npy = output_alpha_npy[0, :, :, :]
-            self.emitStepProgress()
+            self.emit_step_progress()
 
             # background integration
-            if input_bck_integration.isDataAvailable():
+            if input_bck_integration.is_data_available():
                 output_composite_f = fgr * alpha + bck_integration_tensor * (1 - alpha)
                 output_composite_inter = (output_composite_f.permute(0, 2, 3, 1).cpu().numpy() * 255).astype("uint8")[0,
                                          :, :, :]
-                output_composite.setImage(output_composite_inter)
+                output_composite.set_image(output_composite_inter)
             else:
-                output_composite.setImage(output_composite_npy)
+                output_composite.set_image(output_composite_npy)
 
             # outputs recovery
-            output_err.setImage(output_err_npy)
-            output_fgr.setImage(output_fgr_npy)
-            output_alpha.setImage(output_alpha_npy)
+            output_err.set_image(output_err_npy)
+            output_fgr.set_image(output_fgr_npy)
+            output_alpha.set_image(output_alpha_npy)
 
         # Step progress bar:
-        self.emitStepProgress()
+        self.emit_step_progress()
 
-        # Call endTaskRun to finalize process
-        self.endTaskRun()
+        # Call end_task_run to finalize process
+        self.end_task_run()
 
 
 # --------------------
@@ -306,7 +306,7 @@ class InferBckMattingFactory(dataprocess.CTaskFactory):
         dataprocess.CTaskFactory.__init__(self)
         # Set process information as string here
         self.info.name = "infer_background_matting"
-        self.info.shortDescription = "Real-Time High-Resolution Background Matting"
+        self.info.short_description = "Real-Time High-Resolution Background Matting"
         self.info.description = "This algorithm is a real-time, high-resolution background replacement technique which " \
                                 "operates at 30fps in 4K resolution, and 60fps for HD on a modern GPU. The technique " \
                                 "is based on background matting, where an additional frame of the background is" \
@@ -321,15 +321,15 @@ class InferBckMattingFactory(dataprocess.CTaskFactory):
                             "Ira Kemelmacher-Shlizerman"
         # relative path -> as displayed in Ikomia application process tree
         self.info.path = "Plugins/Python/Background"
-        self.info.version = "1.0.1"
-        # self.info.iconPath = "your path to a specific icon"
+        self.info.version = "1.1.0"
+        # self.info.icon_path = "your path to a specific icon"
         self.info.article = "Real-Time High-Resolution Background Matting"
         self.info.journal = "publication journal"
         self.info.year = 2020
         self.info.license = "MIT License"
-        self.info.iconPath = "icon/image.png"
+        self.info.icon_path = "icon/image.png"
         # URL of documentation
-        self.info.documentationLink = "https://arxiv.org/abs/2012.07810"
+        self.info.documentation_link = "https://arxiv.org/abs/2012.07810"
         # Code source repository
         self.info.repository = "https://github.com/PeterL1n/BackgroundMattingV2"
         # Keywords used for search
