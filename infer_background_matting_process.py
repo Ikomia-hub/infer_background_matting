@@ -20,6 +20,7 @@ from ikomia import utils, core, dataprocess
 import copy
 import requests
 import cv2
+import torch
 from torch.nn.modules.module import *
 from torch.nn import functional as F
 from pathlib import Path
