@@ -1,7 +1,6 @@
 import logging
 import cv2
 import numpy as np
-from ikomia.core import task
 from ikomia.utils.tests import run_for_test
 
 
@@ -18,12 +17,12 @@ def test(t, data_dict):
     input_img_1.set_image(img)
     input_img_2 = t.get_input(2)
     input_img_2.set_image(np.zeros_like(img))
-    params = task.get_parameters(t)
+    params = t.get_param_object(t)
     for model_type in ["mattingbase", "mattingrefine"]:
         for backbone in ["resnet101", "resnet50", "mobilenetv2"]:
             params["model_type"] = model_type
             params["model_backbone"] = backbone
             # without update = 1, model is not updated between two tests
             params["update"] = 1
-            task.set_parameters(t, params)
+            t.set_parameters(params)
             yield run_for_test(t)
