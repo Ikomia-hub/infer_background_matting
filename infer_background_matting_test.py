@@ -17,12 +17,9 @@ def test(t, data_dict):
     input_img_1.set_image(img)
     input_img_2 = t.get_input(2)
     input_img_2.set_image(np.zeros_like(img))
-    params = t.get_param_object()
     for model_type in ["mattingbase", "mattingrefine"]:
         for backbone in ["resnet101", "resnet50", "mobilenetv2"]:
-            params["model_type"] = model_type
-            params["model_backbone"] = backbone
-            # without update = 1, model is not updated between two tests
-            params["update"] = 1
-            t.set_parameters(params)
+            t.set_parameters({"model_type": model_type,
+                              "model_backbone": backbone,
+                              "update": 1})
             yield run_for_test(t)
