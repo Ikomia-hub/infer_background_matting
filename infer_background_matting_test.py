@@ -21,5 +21,5 @@ def test(t, data_dict):
         for backbone in ["resnet101", "resnet50", "mobilenetv2"]:
             t.set_parameters({"model_type": model_type,
                               "model_backbone": backbone,
-                              "update": 1})
+                              "update": "1"})
             yield run_for_test(t)
