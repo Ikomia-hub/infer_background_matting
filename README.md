@@ -115,20 +115,14 @@ wf.run()
 Every algorithm produces specific outputs, yet they can be explored them the same way using the Ikomia API. For a more in-depth understanding of managing algorithm outputs, please refer to the [documentation](https://ikomia-dev.github.io/python-api-documentation/advanced_guide/IO_management.html).
 
 ```python
-import ikomia
-from ikomia.dataprocess.workflow import Workflow
+# Add background matting algorithm
+bck_matting = wf.add_task(name="infer_background_matting", auto_connect=True)
 
-# Init your workflow
-wf = Workflow()
-
-# Add algorithm
-algo = wf.add_task(name="infer_background_matting", auto_connect=True)
-
-# Run on your image  
-wf.run_on(url="example_image.png")
+# Run the workflow
+wf.run()
 
 # Iterate over outputs
-for output in algo.get_outputs()
+for output in bck_matting.get_outputs()
     # Print information
     print(output)
     # Export it to JSON
