@@ -19,10 +19,7 @@
     </a> 
 </p>
 
-This algorithm is a real-time, high-resolution background replacement technique which operates at 30fps in 4K resolution, and 60fps for HD on a modern GPU. The technique is based on background matting, where an additional frame of the background is captured and used in recovering the alpha matte and the foreground layer. The main challenge is to compute a high-quality alpha matte, preserving strand-level hair details, while processing high-resolution images in real-time. To achieve this goal,two neural networks are employed: a base network computes a low-resolution result which is refined by a second network operating at high-resolution.It is possible to replace the basic background with a new one by adding it to the algorithm input. 
-
-[Insert illustrative image here. Image must be accessible publicly, in algorithm Github repository for example.
-<img src="images/illustration.png"  alt="Illustrative image" width="30%" height="30%">]
+This algorithm is a real-time, high-resolution background replacement technique which operates at 30fps in 4K resolution, and 60fps for HD on a modern GPU. The technique is based on background matting, where an additional frame of the background is captured and used in recovering the alpha matte and the foreground layer. 
 
 ## :rocket: Use with Ikomia API
 
@@ -36,20 +33,39 @@ pip install ikomia
 
 #### 2. Create your workflow
 
-[Change the sample image URL to fit algorithm purpose]
-
 ```python
-import ikomia
 from ikomia.dataprocess.workflow import Workflow
+from ikomia.utils.displayIO import display
 
 # Init your workflow
 wf = Workflow()
 
-# Add algorithm
-algo = wf.add_task(name="infer_background_matting", auto_connect=True)
+# Set input image with background to replace
+wf.set_image_input(
+    url="https://raw.githubusercontent.com/Ikomia-hub/infer_background_matting/main/sample_image/image1.png",
+    index=0
+)
 
-# Run on your image  
-wf.run_on(url="example_image.png")
+# Set original background input
+wf.set_image_input(
+    url="https://raw.githubusercontent.com/Ikomia-hub/infer_background_matting/main/sample_image/image1_bck (1).png",
+    index=1
+)
+
+# Set new background input
+wf.set_image_input(
+    url="https://raw.githubusercontent.com/Ikomia-hub/infer_background_matting/main/sample_image/image1_bck (2).png",
+    index=2
+)
+
+# Add background matting algorithm
+bck_matting = wf.add_task(name="infer_background_matting", auto_connect=True)
+
+# Run the workflow
+wf.run()
+
+# Display result
+display(bck_matting.get_output(0).get_image())
 ```
 
 ## :sunny: Use with Ikomia Studio
@@ -62,30 +78,37 @@ Ikomia Studio offers a friendly UI with the same features as the API.
 
 ## :pencil: Set algorithm parameters
 
-[Explain each algorithm parameters]
-
-[Change the sample image URL to fit algorithm purpose]
-
 ```python
-import ikomia
-from ikomia.dataprocess.workflow import Workflow
+# Add background matting algorithm
+bck_matting = wf.add_task(name="infer_background_matting", auto_connect=True)
 
-# Init your workflow
-wf = Workflow()
-
-# Add algorithm
-algo = wf.add_task(name="infer_background_matting", auto_connect=True)
-
-algo.set_parameters({
-    "param1": "value1",
-    "param2": "value2",
-    ...
+bck_matting.set_parameters({
+    "model_type": "mattingrefine",
+    "model_backbone": "mobilenetv2",
+    "model_backbone_scale": "0.25",
+    "model_refine_mode": "sampling",
+    "model_refine_pixels": "80000",
+    "model_refine_threshold": "0.7",
+    "cuda": "cuda",
 })
 
-# Run on your image  
-wf.run_on(url="example_image.png")
-
+# Run the workflow
+wf.run()
 ```
+
+- **model_type** (str): choose either *"mattingbase"* or *"mattingrefine"* (default - higher quality)
+- **model_backbone** (str): model backbone, can be *"mobilenetv2"* (default), *"resnet50"* or *"resnet101"*
+- **model_backbone_scale** (float): image downsample scale for passing through backbone (default 0.25)
+- **model_refine_mode** (str): refine area selection mode
+    - *"full"*: no area selection, refine everywhere using regular Conv2d
+    - *"sampling"*: refine fixed amount of pixels ranked by the top most errors (default)
+    - *"thresholding"*: refine varying amount of pixels that has more error than the threshold
+- **model_refine_pixels** (int): only used when *model_refine_mode = "sampling"* (default 80000)
+- **model_refine_threshold** (float [0 - 1]): only used when *model_refine_mode = "thresholding"* (default 0.7)
+- **cuda** (str): "cuda" (default) to execute with CUDA acceleration or "cpu"
+
+***Note***: parameter key and value should be in **string format** when added to the dictionary.
+
 
 ## :mag: Explore algorithm outputs
 
@@ -112,6 +135,9 @@ for output in algo.get_outputs()
     output.to_json()
 ```
 
-## :fast_forward: Advanced usage 
+Background matting algorithm generates 4 outpus:
 
-[optional]
+1. Composite image (CImageIO)
+2. Alpha (CImageIO)
+3. Foreground image (CImageIO)
+4. Error (CImageIO)
