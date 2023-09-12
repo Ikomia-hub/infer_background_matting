@@ -44,7 +44,6 @@ class InferBckMattingParam(core.CWorkflowTaskParam):
         self.model_refine_mode = "sampling"
         self.model_refine_pixels = 80000
         self.model_refine_threshold = 0.7
-        self.kernel_size = 3
         self.cuda = 'cuda'
         self.update = False
 
@@ -56,7 +55,6 @@ class InferBckMattingParam(core.CWorkflowTaskParam):
         self.model_refine_threshold = float(param_map["model_refine_threshold"])
         self.model_refine_mode = param_map["model_refine_mode"]
         self.model_refine_pixels = int(param_map["model_refine_pixels"])
-        self.kernel_size = int(param_map["kernel_size"])
         self.update = utils.strtobool(param_map["update"])
 
     def get_values(self):
@@ -68,7 +66,6 @@ class InferBckMattingParam(core.CWorkflowTaskParam):
         param_map["model_backbone_scale"] = str(self.model_backbone_scale)
         param_map["model_refine_threshold"] = str(self.model_refine_threshold)
         param_map["model_refine_pixels"] = str(self.model_refine_pixels)
-        param_map["kernel_size"] = str(self.kernel_size)
         param_map["update"] = str(self.update)
         return param_map
 
