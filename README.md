@@ -122,7 +122,7 @@ bck_matting = wf.add_task(name="infer_background_matting", auto_connect=True)
 wf.run()
 
 # Iterate over outputs
-for output in bck_matting.get_outputs()
+for output in bck_matting.get_outputs():
     # Print information
     print(output)
     # Export it to JSON
