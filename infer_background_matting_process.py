@@ -305,16 +305,6 @@ class InferBckMattingFactory(dataprocess.CTaskFactory):
         # Set process information as string here
         self.info.name = "infer_background_matting"
         self.info.short_description = "Real-Time High-Resolution Background Matting"
-        self.info.description = "This algorithm is a real-time, high-resolution background replacement technique which " \
-                                "operates at 30fps in 4K resolution, and 60fps for HD on a modern GPU. The technique " \
-                                "is based on background matting, where an additional frame of the background is" \
-                                " captured and used in recovering the alpha matte and the foreground layer. " \
-                                "The main challenge is to compute a high-quality alpha matte, preserving strand-level " \
-                                "hair details, while processing high-resolution images in real-time. " \
-                                "To achieve this goal,two neural networks are employed: a base network computes a " \
-                                "low-resolution result which is refined by a second network operating at " \
-                                "high-resolution.It is possible to replace the basic background with a new one by" \
-                                " adding it to the algorithm input. "
         self.info.authors = "Shanchuan Lin, Andrey Ryabtsev, Soumyadip Sengupta, Brian Curless, Steve Seitz, " \
                             "Ira Kemelmacher-Shlizerman"
         # relative path -> as displayed in Ikomia application process tree
