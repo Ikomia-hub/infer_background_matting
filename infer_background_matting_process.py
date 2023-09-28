@@ -312,14 +312,15 @@ class InferBckMattingFactory(dataprocess.CTaskFactory):
         self.info.version = "1.1.0"
         # self.info.icon_path = "your path to a specific icon"
         self.info.article = "Real-Time High-Resolution Background Matting"
-        self.info.journal = "publication journal"
+        self.info.journal = "Computer Vision and Pattern Recognition"
         self.info.year = 2020
         self.info.license = "MIT License"
         self.info.icon_path = "icon/image.png"
         # URL of documentation
         self.info.documentation_link = "https://arxiv.org/abs/2012.07810"
         # Code source repository
-        self.info.repository = "https://github.com/PeterL1n/BackgroundMattingV2"
+        self.info.repository = "https://github.com/Ikomia-hub/infer_background_matting"
+        self.info.original_repository = "https://github.com/PeterL1n/BackgroundMattingV2"
         # Keywords used for search
         self.info.keywords = "background,matting,refinement,alpha,foreground"
 
