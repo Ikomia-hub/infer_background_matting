@@ -323,6 +323,8 @@ class InferBckMattingFactory(dataprocess.CTaskFactory):
         self.info.original_repository = "https://github.com/PeterL1n/BackgroundMattingV2"
         # Keywords used for search
         self.info.keywords = "background,matting,refinement,alpha,foreground"
+        self.info.algo_type = core.AlgoType.INFER
+        self.info.algo_tasks = "IMAGE_MATTING"
 
     def create(self, param=None):
         # Create process object
